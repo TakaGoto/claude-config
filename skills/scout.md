@@ -10,7 +10,7 @@ You are an autonomous codebase auditor. You scan a target app/project to discove
 **Arguments:** $ARGUMENTS
 Parse arguments:
 - First positional arg: **app name** (required) — e.g., `wicklog`, `loki`, `ace`, `signalai`
-- `--scope <area>`: Limit audit to a specific area: `design`, `frontend`, `mobile`, `backend`, `shared`, or `all` (default: `all`)
+- `--scope <area>`: Limit audit to a specific area: `design`, `frontend`, `mobile`, `backend`, `shared`, `security`, or `all` (default: `all`)
 - `--depth <level>`: `quick` (surface scan), `deep` (thorough audit). Default: `deep`
 
 ---
@@ -59,7 +59,9 @@ Key directories: {list}
 
 ## Phase 1 — Spawn Audit Agents
 
-Spawn audit sub-agents **in parallel** using the Agent tool. Each agent gets:
+**CRITICAL: You MUST use the Agent tool to spawn each auditor as a real sub-agent.** Do NOT simulate agents inline or run audits yourself. Each agent must be a separate Agent tool call with the appropriate `subagent_type`. When spawning multiple agents, make all Agent tool calls in a single message so they run in parallel.
+
+Each agent gets:
 - The Project Context Brief
 - The existing beads issue list (to avoid duplicates)
 - The codebase structure snapshot
@@ -71,23 +73,39 @@ All agents run with **read-only** access. They do NOT modify any files.
 
 **Auto-select agents based on detected stack:**
 
-| Condition | Agent | Why |
-|-----------|-------|-----|
-| Always | **scout-designer** (subagent_type: `scout-designer`) | UI/UX quality applies to all apps |
-| Always | **scout-frontend** (subagent_type: `scout-frontend`) | Code quality applies to all apps |
-| Expo/React Native detected | **scout-mobile** (subagent_type: `scout-mobile`) | Mobile-specific patterns |
-| Backend code exists (API routes, edge functions, DB) | **scout-backend** (subagent_type: `scout-backend`) | Backend quality |
-| Shared packages exist OR app has lib/ with reusable code | **scout-shared** (subagent_type: `scout-shared`) | Shared code quality |
+| Condition | Agent | subagent_type | Why |
+|-----------|-------|---------------|-----|
+| Always | **scout-designer** | `scout-designer` | UI/UX quality applies to all apps |
+| Always | **scout-frontend** | `scout-frontend` | Code quality applies to all apps |
+| Expo/React Native detected | **scout-mobile** | `scout-mobile` | Mobile-specific patterns |
+| Backend code exists (API routes, edge functions, DB) | **scout-backend** | `scout-backend` | Backend quality |
+| Shared packages exist OR app has lib/ with reusable code | **scout-shared** | `scout-shared` | Shared code quality |
+| Always | **security-auditor** | `security-auditor` | OWASP top 10, auth, data privacy |
 
 All agents use model: **sonnet**.
 
 If `--scope` is specified, override auto-detection:
-- `design` → scout-designer only
-- `frontend` → scout-frontend only
-- `mobile` → scout-mobile only
-- `backend` → scout-backend only
-- `shared` → scout-shared only
-- `all` → all auto-detected agents
+- `design` -> scout-designer only
+- `frontend` -> scout-frontend only
+- `mobile` -> scout-mobile only
+- `backend` -> scout-backend only
+- `shared` -> scout-shared only
+- `security` -> security-auditor only
+- `all` -> all auto-detected agents
+
+### Depth Constraints
+
+**`--depth quick`** (surface scan):
+- Each agent reads at most **20 source files** (prioritize screens/routes, stores, and config)
+- Skip test coverage analysis
+- Skip cross-file pattern analysis (focus on per-file issues)
+- Cap at **15 findings** total across all agents
+
+**`--depth deep`** (thorough audit, default):
+- Each agent reads **all source files** in its domain
+- Full test coverage analysis
+- Cross-file pattern analysis (DRY violations, inconsistencies)
+- Cap at **40 findings** total across all agents
 
 ### Agent Prompt Template
 
@@ -105,6 +123,10 @@ You are a Scout auditor.
 ## Codebase Structure
 {tree_snapshot}
 
+## Depth: {quick|deep}
+{if quick: "Surface scan — read at most 20 key files, focus on obvious issues, skip deep analysis."}
+{if deep: "Thorough audit — read all source files, analyze patterns across files, check test coverage."}
+
 ## Your Audit Focus
 {agent-specific instructions from agent definition}
 
@@ -112,13 +134,14 @@ You are a Scout auditor.
 - The app is located at: {app_path}
 - Read files relative to this path
 - All file paths in your findings should be relative to the repo root
+- Cast a wide net — don't limit yourself to only your specialty. If you notice a bug, security issue, or UX problem outside your primary focus, report it.
 
 ## Output Format
 Return a structured list of findings. For each finding:
 
 ### [priority] Title
 - **Type:** bug | feature | task | chore
-- **Area:** mobile | web | shared | ui | api | backend
+- **Area:** mobile | web | shared | ui | api | backend | security
 - **Size:** [s] (< 1 file) | [m] (1-3 files) | [l] (4+ files)
 - **Files:** path/to/file.ts:42, path/to/other.ts:87
 - **Description:** What's wrong or what could be improved, with specific details
@@ -135,21 +158,26 @@ Return a structured list of findings. For each finding:
 
 ---
 
-## Phase 2 — Collect & Deduplicate
+## Phase 2 — Collect, Verify & Deduplicate
 
 After all agents return:
 
 1. **Merge all findings** into a single list
 2. **Deduplicate** — remove findings with substantially similar titles or overlapping file references
 3. **Cross-reference** — drop any finding that matches an existing beads issue
-4. **Sort by priority** (0 = critical → 4 = backlog)
-5. **Cap at 40 findings** — if more, keep only the top 40 by priority
+4. **Verify findings** — for each finding, read the cited file and line number to confirm the issue actually exists. Drop any finding where:
+   - The cited file doesn't exist
+   - The cited line number doesn't contain what the finding claims
+   - The described behavior is not actually present in the code
+   This step prevents false positives from polluting the tracker.
+5. **Sort by priority** (0 = critical -> 4 = backlog)
+6. **Apply depth cap** — quick: keep top 15; deep: keep top 40
 
 ---
 
 ## Phase 3 — Create Beads Issues
 
-Create all findings as beads issues using `bd create`. For each finding:
+Create all verified findings as beads issues using `bd create`. For each finding:
 
 ```bash
 bd create "[{app}] Finding title" \
@@ -165,7 +193,7 @@ bd create "[{app}] Finding title" \
 - **Set type** — use `-t bug`, `-t feature`, `-t task`, or `-t chore`
 - **Include file paths** in the description
 - **Add dependency notes** in the description when one issue depends on another
-- **Label by area** — use `-l mobile`, `-l web`, `-l api`, `-l shared`, `-l ui`
+- **Label by area** — use `-l mobile`, `-l web`, `-l api`, `-l shared`, `-l ui`, `-l security`
 - **Batch efficiently** — create all issues, don't pause between them
 
 After creating all issues, run `bd list --limit 0 | tail -5` to confirm the total count.
@@ -182,10 +210,25 @@ Write a summary report to `docs/scout-reports/{app}-{YYYY-MM-DD}.md`:
 ## Summary
 - App: {app} ({stack})
 - Path: {app_path}
-- New issues created: {n}
+- Depth: {quick|deep}
+- Scope: {scope or "all"}
+- New issues created: {n} ({n_verified} verified, {n_dropped} dropped by verification)
 - By type: {n} bugs, {n} features, {n} tasks, {n} chores
 - By priority: {n} critical, {n} high, {n} medium, {n} low, {n} backlog
 - By area: {breakdown}
+
+## Agents & Cost
+
+| Agent | Findings | Tokens | Duration |
+|-------|----------|--------|----------|
+| scout-designer | {n} | {tokens} | {duration}s |
+| scout-frontend | {n} | {tokens} | {duration}s |
+| scout-mobile | {n} | {tokens} | {duration}s |
+| scout-shared | {n} | {tokens} | {duration}s |
+| security-auditor | {n} | {tokens} | {duration}s |
+| **Total** | **{n}** | **{tokens}** | **{duration}s** |
+
+Note: Capture token counts and duration from each Agent tool's completion notification. If not available, write "N/A".
 
 ## Findings by Auditor
 
@@ -204,6 +247,14 @@ Write a summary report to `docs/scout-reports/{app}-{YYYY-MM-DD}.md`:
 ### Shared & Cross-Platform (scout-shared)
 {findings list with beads IDs — if applicable}
 
+### Security (security-auditor)
+{findings list with beads IDs}
+
+## Verification Results
+- Findings verified: {n}
+- Findings dropped (false positives): {n}
+{list of dropped findings with reasons}
+
 ## Duplicates Skipped
 {findings that matched existing beads issues}
 
@@ -219,5 +270,6 @@ Write a summary report to `docs/scout-reports/{app}-{YYYY-MM-DD}.md`:
 
 - **READ-ONLY audit** — scout never modifies source code
 - **Never report .env, secrets, or credentials in issues** — flag security concerns verbally to the user
-- **Max 40 findings per run** — prevents issue flooding
+- **Always verify before creating** — every finding must be confirmed against actual code
 - **Always deduplicate** — check existing beads before creating new issues
+- **Respect depth caps** — quick: 15 max, deep: 40 max
