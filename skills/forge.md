@@ -43,6 +43,11 @@ Before grooming, detect the target app:
    - **Python**: `cd {app_path} && python -m pytest && python -m mypy .`
    - Or read from `package.json` scripts for custom gates
 
+4. **Run test suite** — execute the test command to check baseline health:
+   - Record pass/fail counts and any failing tests
+   - If tests fail, create a P1 beads issue for each distinct failure (these block other work)
+   - This establishes a baseline so workers know whether test failures are pre-existing or regressions
+
 ---
 
 ## Phase 1 — Grooming
@@ -62,7 +67,8 @@ Before spawning workers, groom the beads queue to ensure issues are ready for im
    - Which existing file to use as a pattern reference
    - Which function signature to follow
    - Which test file to model after
-7. **Close stale issues** — if an issue references code that no longer exists
+   - Size tag: `[s]` (<1 file), `[m]` (1-3 files), `[l]` (4+ files)
+7. **Close stale issues** — if an issue references code that no longer exists, close with `bd close <id> --reason "Stale: <explanation>"`
 8. **Close duplicates** — if two issues cover the same work
 9. **Fix priorities** — ensure P0 issues are truly critical and P3/P4 items aren't blocking higher-priority work
 
@@ -82,7 +88,15 @@ Before spawning workers, groom the beads queue to ensure issues are ready for im
        --notes "auto-discovered from TODO scan"
      ```
 
-3. **If `--dry-run`**: Run `bd ready --json` and `bd list --json` to print the full task list with priorities. Then STOP — do not proceed to Phase 3.
+3. **Spot-check for untracked issues** — while reading code during grooming, note any bugs, missing error handling, or code quality problems that aren't in the tracker. Create beads issues for genuine findings (not style nits). This catches issues that exist in the code but were never filed.
+
+4. **Organize into implementation tiers** — group the final task list into ordered tiers:
+   - **Tier 1: Blockers** — failing tests, data corruption bugs, security issues
+   - **Tier 2: Core functionality** — missing features, broken flows, i18n gaps
+   - **Tier 3: Quality** — accessibility, performance, error handling
+   - **Tier 4: Polish** — refactoring, test coverage, nice-to-haves
+
+5. **If `--dry-run`**: Print the tiered task list with issue counts, size breakdown, and estimated effort. Then STOP — do not proceed to Phase 3.
 
 ---
 
@@ -129,7 +143,12 @@ You are forge {worker-name}.
 - Stack: {stack}
 - Package manager: {pm}
 - Quality gates: {quality_gate_commands}
+- Test command: {test_command}
 - Beads filter prefix: [{app}]
+
+## Pre-existing Test Failures
+{list of failing tests from Phase 0, or "None — all tests pass"}
+Do NOT count these as regressions. Only fail quality gates on NEW test failures.
 ```
 
 Do NOT duplicate the worker workflow here — the agent definition handles that.
@@ -167,11 +186,29 @@ After spawning workers, enter a monitoring loop:
 
 ## Summary
 - App: {app} ({stack})
+- Quality gates: {quality_gate_commands}
+- Test baseline: {n} passing, {n} failing (pre-existing)
 - Started: {time}
 - Ended: {time}
 - Tasks completed: {n}/{total}
 - PRs merged to staging: {n}
 - Rate limit pauses: {n}
+
+## Grooming Summary
+- Issues verified: {n}
+- Stale issues closed: {n}
+- Issues updated with hints: {n}
+- New issues discovered: {n}
+
+## Implementation Tiers
+### Tier 1: Blockers
+{list}
+### Tier 2: Core Functionality
+{list}
+### Tier 3: Quality
+{list}
+### Tier 4: Polish
+{list}
 
 ## Completed Tasks
 | Bead ID | Task | PR | Worker |
@@ -189,9 +226,6 @@ After spawning workers, enter a monitoring loop:
 ## PRs Merged to Staging
 - #URL — Description (worker-1)
 - #URL — Description (worker-2)
-
-## Auto-Discovered TODOs
-- file.ts:42 — TODO: description
 ```
 
 ---
