@@ -1,0 +1,35 @@
+# Session & runtime data
+history.jsonl
+stats-cache.json
+mcp-needs-auth-cache.json
+statsig/
+cache/
+debug/
+downloads/
+file-history/
+paste-cache/
+plans/
+plugins/
+session-env/
+sessions/
+shell-snapshots/
+tasks/
+telemetry/
+todos/
+usage-data/
+backups/
+
+# Project-specific data (contains session artifacts, worktrees, memory per-project)
+projects/
+
+# Teams (contains local inbox/config state)
+teams/
+
+# Local-only settings (machine-specific permissions, paths)
+settings.local.json
+
+# Local-only infrastructure registry (Supabase URLs, EAS IDs, bundle IDs)
+registry.local.md
+
+# OS junk
+.DS_Store
