@@ -1,5 +1,5 @@
 ---
-name: nightshift-security
+name: security-auditor
 description: Read-only security audit agent. Checks OWASP Top 10, auth patterns, data privacy, and common vulnerability patterns.
 tools: Read, Grep, Glob
 model: sonnet
