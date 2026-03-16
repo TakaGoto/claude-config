@@ -79,7 +79,20 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 <div class="error-banner" id="errorBanner"></div>
 
 <!-- Summary cards -->
-<div class="grid" id="summaryGrid"></div>
+<div class="grid" id="summaryGrid">
+  <div class="card">
+    <div class="card-title">Overall Progress</div>
+    <div class="stat-row"><span class="stat-label">Total tickets</span><span class="stat-value" id="stat-total">-</span></div>
+    <div class="stat-row"><span class="stat-label">Closed</span><span class="stat-value" id="stat-closed" style="color:var(--green)">-</span></div>
+    <div class="stat-row"><span class="stat-label">In progress</span><span class="stat-value" id="stat-inprogress" style="color:var(--yellow)">-</span></div>
+    <div class="stat-row"><span class="stat-label">Open</span><span class="stat-value" id="stat-open" style="color:var(--blue)">-</span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill-main" style="width:0%;background:var(--green)"></div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Apps</div>
+    <div id="apps-list"></div>
+  </div>
+</div>
 
 <!-- Active workers -->
 <div class="card" style="margin-bottom: 16px;" id="workersCard">
@@ -103,7 +116,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 
 <script>
 const POLL_INTERVAL = 15000;
-let pollTimer = null;
+let prevData = null;
 
 function statusBadge(status) {
   const map = {
@@ -121,70 +134,83 @@ function priorityBadge(p) {
   return `<span class="badge ${map[p] || 'badge-muted'}">${p}</span>`;
 }
 
-function renderSummary(data) {
-  const grid = document.getElementById('summaryGrid');
+// Update a text node only if the value changed
+function setText(id, text) {
+  const el = document.getElementById(id);
+  if (el && el.textContent !== text) el.textContent = text;
+}
+
+// Update an element's innerHTML only if it changed
+function setHTML(id, html) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el._lastHTML !== html) {
+    el.innerHTML = html;
+    el._lastHTML = html;
+  }
+}
+
+// Update a style property only if it changed
+function setStyle(el, prop, value) {
+  if (el.style[prop] !== value) el.style[prop] = value;
+}
+
+function computeSummary(data) {
   const total = data.tickets.length;
   const closed = data.tickets.filter(t => t.status === 'closed').length;
   const inProgress = data.tickets.filter(t => t.status === 'in_progress').length;
   const open = data.tickets.filter(t => t.status === 'open').length;
   const pct = total > 0 ? Math.round((closed / total) * 100) : 0;
+  return { total, closed, inProgress, open, pct };
+}
 
-  grid.innerHTML = `
-    <div class="card">
-      <div class="card-title">Overall Progress</div>
-      <div class="stat-row"><span class="stat-label">Total tickets</span><span class="stat-value">${total}</span></div>
-      <div class="stat-row"><span class="stat-label">Closed</span><span class="stat-value" style="color:var(--green)">${closed}</span></div>
-      <div class="stat-row"><span class="stat-label">In progress</span><span class="stat-value" style="color:var(--yellow)">${inProgress}</span></div>
-      <div class="stat-row"><span class="stat-label">Open</span><span class="stat-value" style="color:var(--blue)">${open}</span></div>
-      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:var(--green)"></div></div>
+function renderSummary(data) {
+  const s = computeSummary(data);
+  setText('stat-total', String(s.total));
+  setText('stat-closed', String(s.closed));
+  setText('stat-inprogress', String(s.inProgress));
+  setText('stat-open', String(s.open));
+  const fill = document.getElementById('progress-fill-main');
+  if (fill) setStyle(fill, 'width', s.pct + '%');
+
+  // Apps card — only rebuild if apps changed
+  const appsHTML = Object.entries(data.apps).map(([app, counts]) => `
+    <div class="stat-row">
+      <span><span class="app-tag">${app}</span></span>
+      <span class="stat-value">${counts.closed}/${counts.total}</span>
     </div>
-    <div class="card">
-      <div class="card-title">Apps</div>
-      ${Object.entries(data.apps).map(([app, counts]) => `
-        <div class="stat-row">
-          <span><span class="app-tag">${app}</span></span>
-          <span class="stat-value">${counts.closed}/${counts.total}</span>
-        </div>
-      `).join('')}
-    </div>
-  `;
+  `).join('');
+  setHTML('apps-list', appsHTML);
 }
 
 function renderWorkers(data) {
-  const container = document.getElementById('workersContent');
   const workers = data.tickets.filter(t => t.status === 'in_progress');
-
-  if (workers.length === 0) {
-    container.innerHTML = '<div class="empty">No active workers</div>';
-    return;
-  }
-
-  container.innerHTML = `<div class="grid">${workers.map(t => `
-    <div class="card worker-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <span class="ticket-id">${t.id}</span>
-        <span class="app-tag">${t.app}</span>
-      </div>
-      <div style="font-size:14px;margin-bottom:8px">${t.title}</div>
-      <div class="stat-row"><span class="stat-label">Worker</span><span class="stat-value">${t.assignee || '?'}</span></div>
-      <div class="stat-row"><span class="stat-label">Priority</span>${priorityBadge(t.priority)}</div>
-      <div class="stat-row"><span class="stat-label">Type</span><span class="badge badge-muted">${t.type || '?'}</span></div>
-    </div>
-  `).join('')}</div>`;
+  const html = workers.length === 0
+    ? '<div class="empty">No active workers</div>'
+    : `<div class="grid">${workers.map(t => `
+        <div class="card worker-card" data-id="${t.id}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span class="ticket-id">${t.id}</span>
+            <span class="app-tag">${t.app}</span>
+          </div>
+          <div style="font-size:14px;margin-bottom:8px">${t.title}</div>
+          <div class="stat-row"><span class="stat-label">Repo</span><span class="stat-value" style="font-size:12px">${t.repo || '-'}</span></div>
+          <div class="stat-row"><span class="stat-label">Priority</span>${priorityBadge(t.priority)}</div>
+          <div class="stat-row"><span class="stat-label">Type</span><span class="badge badge-muted">${t.type || '?'}</span></div>
+        </div>
+      `).join('')}</div>`;
+  setHTML('workersContent', html);
 }
 
 function renderQueue(data) {
-  const container = document.getElementById('queueContent');
-
   if (Object.keys(data.apps).length === 0) {
-    container.innerHTML = '<div class="empty">No tickets in queue</div>';
+    setHTML('queueContent', '<div class="empty">No tickets in queue</div>');
     return;
   }
-
-  container.innerHTML = Object.entries(data.apps).map(([app, counts]) => {
+  const html = Object.entries(data.apps).map(([app, counts]) => {
     const pct = counts.total > 0 ? Math.round((counts.closed / counts.total) * 100) : 0;
     return `
-      <div style="margin-bottom:16px">
+      <div style="margin-bottom:16px" data-app="${app}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
           <span class="app-tag">${app}</span>
           <span class="stat-value" style="font-size:13px">${counts.closed}/${counts.total} done (${pct}%)</span>
@@ -198,17 +224,15 @@ function renderQueue(data) {
       </div>
     `;
   }).join('');
+  setHTML('queueContent', html);
 }
 
 function renderTickets(data) {
-  const container = document.getElementById('ticketsContent');
-
   if (data.tickets.length === 0) {
-    container.innerHTML = '<div class="empty">No tickets</div>';
+    setHTML('ticketsContent', '<div class="empty">No tickets</div>');
     return;
   }
 
-  // Sort: in_progress first, then open, then closed. Within each group, by priority.
   const order = { 'in_progress': 0, 'open': 1, 'blocked': 2, 'closed': 3 };
   const sorted = [...data.tickets].sort((a, b) => {
     const so = (order[a.status] ?? 9) - (order[b.status] ?? 9);
@@ -216,12 +240,18 @@ function renderTickets(data) {
     return (a.priority || 'P9').localeCompare(b.priority || 'P9');
   });
 
+  // Build a fingerprint to avoid re-rendering if nothing changed
+  const fingerprint = sorted.map(t => `${t.id}:${t.status}:${t.priority}`).join('|');
+  const container = document.getElementById('ticketsContent');
+  if (container._fingerprint === fingerprint) return;
+  container._fingerprint = fingerprint;
+
   container.innerHTML = `
     <table>
       <thead><tr><th>ID</th><th>Repo</th><th>App</th><th>Priority</th><th>Status</th><th>Title</th><th>Assignee</th></tr></thead>
       <tbody>
         ${sorted.map(t => `
-          <tr style="${t.status === 'closed' ? 'opacity:0.4' : ''}">
+          <tr style="${t.status === 'closed' ? 'opacity:0.4' : ''}" data-id="${t.id}">
             <td class="ticket-id">${t.id}</td>
             <td style="color:var(--muted);font-size:11px">${t.repo || '-'}</td>
             <td><span class="app-tag">${t.app}</span></td>
@@ -243,21 +273,22 @@ async function poll() {
     const data = await res.json();
 
     document.getElementById('errorBanner').style.display = 'none';
-    document.getElementById('lastUpdate').textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+    setText('lastUpdate', 'Updated: ' + new Date().toLocaleTimeString());
 
     renderSummary(data);
     renderWorkers(data);
     renderQueue(data);
     renderTickets(data);
+    prevData = data;
   } catch (err) {
     const banner = document.getElementById('errorBanner');
-    banner.textContent = `Failed to fetch status: ${err.message}`;
+    banner.textContent = 'Failed to fetch status: ' + err.message;
     banner.style.display = 'block';
   }
 }
 
 poll();
-pollTimer = setInterval(poll, POLL_INTERVAL);
+setInterval(poll, POLL_INTERVAL);
 </script>
 </body>
 </html>"""
