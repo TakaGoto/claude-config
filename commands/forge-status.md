@@ -1,6 +1,6 @@
 # Forge Status
 
-Open the live Forge monitoring dashboard.
+Open the live Forge monitoring dashboard. Aggregates beads from ALL repos under ~/terror/ that have beads initialized.
 
 ## Steps
 
@@ -15,8 +15,10 @@ Open the live Forge monitoring dashboard.
 3. Tell the user the dashboard is running and how to stop it:
    - Dashboard URL: http://localhost:3141
    - Auto-refreshes every 15 seconds
+   - Auto-discovers all repos under ~/terror/ with beads
+   - To monitor specific repos only: `python ~/.claude/scripts/forge-dashboard.py --repo ~/terror/card-id --repo ~/terror/punk_records`
    - Stop with: `kill $(lsof -ti:3141)` or Ctrl+C if running in foreground
-   - Shows: worker status, ticket progress per app, queue health, all tickets sorted by status
+   - Shows: worker status, ticket progress per app and repo, queue health, all tickets sorted by status
 
 If the port is already in use (another dashboard is running), just open the URL — don't start a second server.
 

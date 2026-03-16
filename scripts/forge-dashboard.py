@@ -10,6 +10,8 @@ Usage:
 
 import argparse
 import json
+import os
+import re
 import subprocess
 import sys
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -216,11 +218,12 @@ function renderTickets(data) {
 
   container.innerHTML = `
     <table>
-      <thead><tr><th>ID</th><th>App</th><th>Priority</th><th>Status</th><th>Title</th><th>Assignee</th></tr></thead>
+      <thead><tr><th>ID</th><th>Repo</th><th>App</th><th>Priority</th><th>Status</th><th>Title</th><th>Assignee</th></tr></thead>
       <tbody>
         ${sorted.map(t => `
           <tr style="${t.status === 'closed' ? 'opacity:0.4' : ''}">
             <td class="ticket-id">${t.id}</td>
+            <td style="color:var(--muted);font-size:11px">${t.repo || '-'}</td>
             <td><span class="app-tag">${t.app}</span></td>
             <td>${priorityBadge(t.priority)}</td>
             <td>${statusBadge(t.status)}</td>
@@ -260,97 +263,108 @@ pollTimer = setInterval(poll, POLL_INTERVAL);
 </html>"""
 
 
+REPO_DIRS = []  # Set by main() from --repo args
+
+
 def get_beads_status():
-    """Read beads state and return structured data."""
-    try:
-        result = subprocess.run(
-            ["bd", "list", "--limit", "0", "--json"],
-            capture_output=True, text=True, timeout=10
-        )
-        if result.returncode != 0:
-            # Fallback: parse text output
-            return parse_text_output()
-        raw = json.loads(result.stdout)
-        return format_beads_data(raw)
-    except (json.JSONDecodeError, FileNotFoundError):
-        return parse_text_output()
-    except subprocess.TimeoutExpired:
-        return {"tickets": [], "apps": {}, "error": "bd command timed out"}
+    """Read beads state from all configured repos and return aggregated data."""
+    all_tickets = []
+    errors = []
+
+    for repo_dir in REPO_DIRS:
+        try:
+            result = subprocess.run(
+                ["bd", "list", "--limit", "0", "--json"],
+                capture_output=True, text=True, timeout=10,
+                cwd=repo_dir
+            )
+            if result.returncode != 0 or not result.stdout.strip():
+                tickets = parse_text_output_for_repo(repo_dir)
+                all_tickets.extend(tickets)
+            else:
+                raw = json.loads(result.stdout)
+                tickets = format_beads_data_list(raw, repo_dir)
+                all_tickets.extend(tickets)
+        except (json.JSONDecodeError, FileNotFoundError):
+            tickets = parse_text_output_for_repo(repo_dir)
+            all_tickets.extend(tickets)
+        except subprocess.TimeoutExpired:
+            errors.append(f"bd timed out for {repo_dir}")
+
+    resp = build_response(all_tickets)
+    if errors:
+        resp["errors"] = errors
+    return resp
 
 
-def parse_text_output():
-    """Parse bd list text output when --json isn't available or fails."""
+def parse_text_output_for_repo(repo_dir):
+    """Parse bd list text output for a specific repo."""
     try:
         result = subprocess.run(
             ["bd", "list", "--limit", "0"],
-            capture_output=True, text=True, timeout=10
+            capture_output=True, text=True, timeout=10,
+            cwd=repo_dir
         )
         tickets = []
+        repo_name = os.path.basename(repo_dir)
         for line in result.stdout.strip().split("\n"):
             if not line.strip():
                 continue
-            # Parse format: ○ punk_records-abc ● P2 [bug] [wicklog] Title here
-            # or: ◐ punk_records-abc ● P2 [wicklog] Title here
-            ticket = parse_beads_line(line)
+            ticket = parse_beads_line(line, repo_name)
             if ticket:
                 tickets.append(ticket)
+        return tickets
+    except Exception:
+        return []
 
-        return build_response(tickets)
-    except Exception as e:
-        return {"tickets": [], "apps": {}, "error": str(e)}
 
-
-def parse_beads_line(line):
+def parse_beads_line(line, repo_name=""):
     """Parse a single beads list line into a ticket dict."""
     line = line.strip()
-    if not line:
+    if not line or line.startswith("---") or line.startswith("Total:"):
         return None
 
     # Determine status from icon
     status = "open"
-    if line.startswith("◐") or "in_progress" in line.lower():
+    if line.startswith("\u25d0"):  # ◐
         status = "in_progress"
-    elif line.startswith("✓") or line.startswith("●"):
+    elif line.startswith("\u2713"):  # ✓
         status = "closed"
 
-    # Extract ID
-    parts = line.split()
-    ticket_id = None
-    for p in parts:
-        if p.startswith("punk_records-") or p.startswith("bd-"):
-            ticket_id = p
-            break
+    # Extract ID — match any word-with-hyphens that contains a short hash suffix
+    # Formats: punk_records-abc, card-id-23t, bd-a1b2, myproject-xyz
+    id_match = re.search(r'(\S+-[a-z0-9]{2,5})\b', line)
+    ticket_id = id_match.group(1) if id_match else None
 
     if not ticket_id:
         return None
 
     # Extract priority
     priority = "P3"
-    for p in parts:
-        if p in ("P0", "P1", "P2", "P3", "P4"):
-            priority = p
-            break
+    priority_match = re.search(r'\b(P[0-4])\b', line)
+    if priority_match:
+        priority = priority_match.group(1)
 
-    # Extract app name from [app] tag
-    app = "unknown"
-    import re
-    app_match = re.search(r'\[(\w+)\]', line)
-    # Skip type tags
+    # Extract tags from [brackets]
     type_tags = {"bug", "feature", "task", "chore"}
-    for m in re.finditer(r'\[(\w+)\]', line):
-        if m.group(1).lower() not in type_tags:
-            app = m.group(1)
+    tags = re.findall(r'\[([\w-]+)\]', line)
+
+    # First non-type tag is the app name
+    app = "unknown"
+    for tag in tags:
+        if tag.lower() not in type_tags:
+            app = tag
             break
 
-    # Extract type
+    # First type tag is the ticket type
     ticket_type = "task"
-    for m in re.finditer(r'\[(\w+)\]', line):
-        if m.group(1).lower() in type_tags:
-            ticket_type = m.group(1).lower()
+    for tag in tags:
+        if tag.lower() in type_tags:
+            ticket_type = tag.lower()
             break
 
     # Extract title (everything after the last ] tag)
-    title_match = re.search(r'\]([^[]*?)$', line)
+    title_match = re.search(r'\]([^[\]]*?)$', line)
     title = title_match.group(1).strip() if title_match else line
 
     return {
@@ -361,12 +375,14 @@ def parse_beads_line(line):
         "type": ticket_type,
         "title": title,
         "assignee": None,
+        "repo": repo_name,
     }
 
 
-def format_beads_data(raw):
-    """Format raw JSON beads data."""
+def format_beads_data_list(raw, repo_dir):
+    """Format raw JSON beads data into a list of tickets."""
     tickets = []
+    repo_name = os.path.basename(repo_dir)
     if isinstance(raw, list):
         for item in raw:
             tickets.append({
@@ -377,13 +393,13 @@ def format_beads_data(raw):
                 "type": item.get("type", "task"),
                 "title": item.get("title", ""),
                 "assignee": item.get("assignee"),
+                "repo": repo_name,
             })
-    return build_response(tickets)
+    return tickets
 
 
 def extract_app(title):
     """Extract app name from [app] title prefix."""
-    import re
     match = re.search(r'\[(\w+)\]', title)
     type_tags = {"bug", "feature", "task", "chore"}
     for m in re.finditer(r'\[(\w+)\]', title):
@@ -429,36 +445,42 @@ class DashboardHandler(BaseHTTPRequestHandler):
         pass  # Suppress request logs
 
 
-def find_repo_root():
-    """Find the nearest git repo root, preferring punk_records."""
-    import os
-    # Check common locations
-    candidates = [
-        os.path.expanduser("~/terror/punk_records"),
-        os.getcwd(),
-    ]
-    for path in candidates:
-        if os.path.isdir(os.path.join(path, ".git")):
-            return path
-    # Walk up from cwd
-    path = os.getcwd()
-    while path != "/":
-        if os.path.isdir(os.path.join(path, ".git")):
-            return path
-        path = os.path.dirname(path)
-    return os.getcwd()
+def discover_repos():
+    """Find all git repos under ~/terror/ that have beads initialized."""
+    terror_dir = os.path.expanduser("~/terror")
+    repos = []
+    if not os.path.isdir(terror_dir):
+        return repos
+    for entry in os.listdir(terror_dir):
+        path = os.path.join(terror_dir, entry)
+        if os.path.isdir(path) and os.path.isdir(os.path.join(path, ".git")):
+            # Check if beads is initialized (has .beads/ dir)
+            if os.path.isdir(os.path.join(path, ".beads")):
+                repos.append(path)
+    return sorted(repos)
 
 
 def main():
+    global REPO_DIRS
+
     parser = argparse.ArgumentParser(description="Forge Dashboard")
     parser.add_argument("--port", type=int, default=3141, help="Port to serve on")
-    parser.add_argument("--repo", type=str, default=None, help="Path to git repo (auto-detected if omitted)")
+    parser.add_argument("--repo", type=str, action="append", default=None,
+                        help="Path to git repo (can specify multiple). Auto-discovers all repos under ~/terror/ if omitted.")
     args = parser.parse_args()
 
-    repo = args.repo or find_repo_root()
-    import os
-    os.chdir(repo)
-    print(f"Using repo: {repo}")
+    if args.repo:
+        REPO_DIRS = [os.path.expanduser(r) for r in args.repo]
+    else:
+        REPO_DIRS = discover_repos()
+
+    if not REPO_DIRS:
+        print("No repos found. Use --repo <path> to specify manually.")
+        sys.exit(1)
+
+    print(f"Monitoring {len(REPO_DIRS)} repos:")
+    for r in REPO_DIRS:
+        print(f"  - {r}")
 
     server = HTTPServer(("127.0.0.1", args.port), DashboardHandler)
     url = f"http://localhost:{args.port}"
