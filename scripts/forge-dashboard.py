@@ -33,71 +33,97 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 <link id="favicon" rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x2692;</text></svg>">
 <style>
   [data-theme="dark"] {
-    --bg: #0a0a0a; --surface: #141414; --surface2: #1a1a1a; --border: #262626;
-    --text: #e5e5e5; --muted: #737373; --accent: #8b5cf6;
-    --green: #22c55e; --yellow: #eab308; --red: #ef4444; --blue: #3b82f6;
+    --bg: #09090b; --surface: #18181b; --surface2: #1e1e22; --border: #27272a;
+    --text: #fafafa; --text2: #d4d4d8; --muted: #a1a1aa;
+    --accent: #8b5cf6; --accent-bg: rgba(139,92,246,0.12);
+    --green: #22c55e; --green-bg: rgba(34,197,94,0.12);
+    --yellow: #eab308; --yellow-bg: rgba(234,179,8,0.12);
+    --red: #ef4444; --red-bg: rgba(239,68,68,0.12);
+    --blue: #3b82f6; --blue-bg: rgba(59,130,246,0.12);
+    --muted-bg: rgba(161,161,170,0.1);
   }
   [data-theme="light"] {
-    --bg: #f5f5f5; --surface: #ffffff; --surface2: #fafafa; --border: #e5e5e5;
-    --text: #171717; --muted: #737373; --accent: #7c3aed;
-    --green: #16a34a; --yellow: #ca8a04; --red: #dc2626; --blue: #2563eb;
+    --bg: #f8fafc; --surface: #ffffff; --surface2: #f1f5f9; --border: #e2e8f0;
+    --text: #0f172a; --text2: #334155; --muted: #64748b;
+    --accent: #7c3aed; --accent-bg: rgba(124,58,237,0.08);
+    --green: #16a34a; --green-bg: rgba(22,163,74,0.08);
+    --yellow: #ca8a04; --yellow-bg: rgba(202,138,4,0.08);
+    --red: #dc2626; --red-bg: rgba(220,38,38,0.08);
+    --blue: #2563eb; --blue-bg: rgba(37,99,235,0.08);
+    --muted-bg: rgba(100,116,139,0.06);
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; background: var(--bg); color: var(--text); padding: 24px; transition: background 0.3s, color 0.3s; }
-  h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
-  .subtitle { color: var(--muted); font-size: 13px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 16px; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; transition: background 0.3s, border-color 0.3s; }
-  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-  .card-title { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
-  .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; }
+  body { font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); padding: 24px 32px; transition: background 0.3s, color 0.3s; max-width: 1400px; margin: 0 auto; }
+  .mono { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+  .subtitle { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 16px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } body { padding: 16px; } }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; transition: background 0.3s, border-color 0.3s; }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .card-title { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+  .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
   .stat-label { color: var(--muted); font-size: 13px; }
-  .stat-value { font-size: 14px; font-weight: 600; transition: color 0.3s; }
-  .stat-value.pulse { animation: pulse 0.6s ease; }
-  @keyframes pulse { 0%{transform:scale(1)} 50%{transform:scale(1.2)} 100%{transform:scale(1)} }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-  .badge-green { background: #22c55e20; color: var(--green); }
-  .badge-yellow { background: #eab30820; color: var(--yellow); }
-  .badge-red { background: #ef444420; color: var(--red); }
-  .badge-blue { background: #3b82f620; color: var(--blue); }
-  .badge-muted { background: #73737320; color: var(--muted); }
+  .stat-value { font-size: 16px; font-weight: 700; font-family: 'SF Mono', 'Fira Code', monospace; transition: color 0.3s; }
+  .stat-value.pulse { animation: pulse 0.5s cubic-bezier(0.4,0,0.2,1); }
+  @keyframes pulse { 0%{transform:scale(1)} 40%{transform:scale(1.15)} 100%{transform:scale(1)} }
+  .badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; font-family: inherit; }
+  .badge-green { background: var(--green-bg); color: var(--green); }
+  .badge-yellow { background: var(--yellow-bg); color: var(--yellow); }
+  .badge-red { background: var(--red-bg); color: var(--red); }
+  .badge-blue { background: var(--blue-bg); color: var(--blue); }
+  .badge-muted { background: var(--muted-bg); color: var(--muted); }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { text-align: left; color: var(--muted); font-weight: 500; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-  td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { text-align: left; color: var(--muted); font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  td { padding: 12px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   tr:last-child td { border-bottom: none; }
-  tr.clickable { cursor: pointer; }
+  tr.clickable { cursor: pointer; transition: background 0.15s; }
   tr.clickable:hover { background: var(--surface2); }
-  .app-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: #8b5cf620; color: var(--accent); }
-  .progress-bar { width: 100%; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 8px; }
-  .progress-fill { height: 100%; border-radius: 3px; transition: width 0.8s ease; }
+  tr.clickable td:first-child::before { content: ''; display: inline-block; width: 0; height: 0; border-left: 4px solid var(--muted); border-top: 3px solid transparent; border-bottom: 3px solid transparent; margin-right: 6px; transition: transform 0.2s; }
+  tr.clickable.expanded td:first-child::before { transform: rotate(90deg); }
+  .app-tag { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; background: var(--accent-bg); color: var(--accent); }
+  .progress-bar { width: 100%; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 10px; }
+  .progress-fill { height: 100%; border-radius: 3px; transition: width 0.8s cubic-bezier(0.4,0,0.2,1); background: var(--accent); }
   .worker-card { border-left: 3px solid var(--accent); }
-  .ticket-id { color: var(--accent); font-weight: 600; }
-  .empty { color: var(--muted); font-style: italic; padding: 20px; text-align: center; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
-  .header-right { display: flex; align-items: center; gap: 12px; }
-  .last-update { color: var(--muted); font-size: 12px; }
-  .error-banner { background: #ef444420; border: 1px solid var(--red); color: var(--red); padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; display: none; }
-  .elapsed { color: var(--yellow); font-size: 12px; font-weight: 600; }
+  .ticket-id { color: var(--accent); font-weight: 600; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }
+  .empty { color: var(--muted); padding: 32px; text-align: center; font-size: 14px; }
+  .empty-hero { padding: 60px 32px; text-align: center; }
+  .empty-hero h2 { font-size: 18px; font-weight: 600; margin-bottom: 8px; color: var(--text2); }
+  .empty-hero p { color: var(--muted); font-size: 14px; line-height: 1.6; max-width: 400px; margin: 0 auto; }
+  .empty-hero code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-family: 'SF Mono', monospace; font-size: 13px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }
+  .header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .last-update { color: var(--muted); font-size: 12px; font-family: 'SF Mono', monospace; }
+  .error-banner { background: var(--red-bg); border: 1px solid var(--red); color: var(--red); padding: 12px 16px; border-radius: 10px; margin-bottom: 16px; display: none; font-size: 13px; }
+  .elapsed { color: var(--yellow); font-size: 13px; font-weight: 700; font-family: 'SF Mono', monospace; }
   .eta-card { border-left: 3px solid var(--green); }
   /* Activity feed */
-  .feed { max-height: 200px; overflow-y: auto; font-size: 12px; }
-  .feed-item { padding: 6px 0; border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: baseline; }
+  .feed { max-height: 220px; overflow-y: auto; font-size: 13px; }
+  .feed-item { padding: 8px 0; border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: baseline; }
   .feed-item:last-child { border-bottom: none; }
-  .feed-time { color: var(--muted); flex-shrink: 0; width: 65px; }
-  .feed-msg { color: var(--text); }
-  .feed-new { animation: fadeIn 0.5s ease; }
-  @keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+  .feed-time { color: var(--muted); flex-shrink: 0; width: 70px; font-family: 'SF Mono', monospace; font-size: 12px; }
+  .feed-msg { color: var(--text2); }
+  .feed-new { animation: fadeIn 0.4s cubic-bezier(0.4,0,0.2,1); }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
   /* Ticket detail */
-  .detail-row { display: none; }
-  .detail-row.open { display: table-row; }
-  .detail-cell { padding: 12px 16px; background: var(--surface2); font-size: 12px; line-height: 1.6; white-space: pre-wrap; color: var(--muted); }
+  .detail-row { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+  .detail-row td { padding: 0; border-bottom: none; }
+  .detail-row.open { max-height: 400px; }
+  .detail-row.open td { padding: 0; }
+  .detail-cell { padding: 16px 20px; background: var(--surface2); font-size: 12px; line-height: 1.7; white-space: pre-wrap; color: var(--text2); font-family: 'SF Mono', monospace; border-radius: 0 0 8px 8px; margin: 0 4px 8px 4px; }
   /* Toolbar */
-  .toolbar { display: flex; gap: 8px; align-items: center; }
-  .btn { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 4px 10px; border-radius: 4px; font-size: 11px; font-family: inherit; cursor: pointer; transition: all 0.2s; }
+  .toolbar { display: flex; gap: 6px; align-items: center; }
+  .btn { background: var(--surface); border: 1px solid var(--border); color: var(--muted); padding: 5px 12px; border-radius: 6px; font-size: 12px; font-family: inherit; cursor: pointer; transition: all 0.15s; font-weight: 500; }
   .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .btn.active { background: var(--accent); color: white; border-color: var(--accent); }
-  .refresh-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 2px; background: var(--border); }
-  .refresh-bar-fill { height: 100%; background: var(--accent); transition: width 0.1s linear; width: 0%; }
+  .btn-icon { padding: 5px 8px; font-size: 14px; }
+  .btn-export { color: var(--muted); font-size: 11px; opacity: 0.7; }
+  .btn-export:hover { opacity: 1; }
+  .separator { width: 1px; height: 16px; background: var(--border); }
+  .refresh-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 3px; background: var(--border); z-index: 10; }
+  .refresh-bar-fill { height: 100%; background: var(--accent); transition: width 0.1s linear; width: 0%; opacity: 0.6; }
 </style>
 </head>
 <body>
@@ -110,9 +136,11 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   <div class="header-right">
     <div class="toolbar">
       <button class="btn" id="btnHideClosed" onclick="toggleClosed()">Hide Closed</button>
-      <button class="btn" id="btnTheme" onclick="toggleTheme()">Light</button>
-      <button class="btn" onclick="exportData('json')">JSON</button>
-      <button class="btn" onclick="exportData('md')">Markdown</button>
+      <div class="separator"></div>
+      <button class="btn btn-icon" id="btnTheme" onclick="toggleTheme()" title="Toggle theme">&#9788;</button>
+      <div class="separator"></div>
+      <button class="btn btn-export" onclick="exportData('json')">Export JSON</button>
+      <button class="btn btn-export" onclick="exportData('md')">Export MD</button>
     </div>
     <div class="last-update" id="lastUpdate">--:--:--</div>
   </div>
@@ -120,55 +148,64 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 
 <div class="error-banner" id="errorBanner"></div>
 
-<!-- Summary + ETA -->
-<div class="grid" id="summaryGrid">
+<!-- Empty hero (shown when no tickets) -->
+<div id="emptyHero" class="card empty-hero" style="display:none">
+  <h2>No active forge runs</h2>
+  <p>Start a forge run to see worker progress here.<br><br><code>/forge wicklog</code> or <code>/forge loki</code></p>
+</div>
+
+<!-- Main content (hidden when empty) -->
+<div id="mainContent">
+  <!-- Summary + ETA -->
+  <div class="grid">
+    <div class="card">
+      <div class="card-title">Progress</div>
+      <div class="stat-row"><span class="stat-label">Total</span><span class="stat-value" id="stat-total">-</span></div>
+      <div class="stat-row"><span class="stat-label">Closed</span><span class="stat-value" id="stat-closed" style="color:var(--green)">-</span></div>
+      <div class="stat-row"><span class="stat-label">In progress</span><span class="stat-value" id="stat-inprogress" style="color:var(--yellow)">-</span></div>
+      <div class="stat-row"><span class="stat-label">Open</span><span class="stat-value" id="stat-open" style="color:var(--blue)">-</span></div>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill-main" style="width:0%"></div></div>
+    </div>
+    <div class="card eta-card">
+      <div class="card-title">Estimated Completion</div>
+      <div class="stat-row"><span class="stat-label">Avg time/ticket</span><span class="stat-value" id="eta-avg">-</span></div>
+      <div class="stat-row"><span class="stat-label">Remaining</span><span class="stat-value" id="eta-remaining">-</span></div>
+      <div class="stat-row"><span class="stat-label">ETA</span><span class="stat-value" id="eta-time" style="color:var(--green)">-</span></div>
+      <div id="apps-list" style="margin-top:10px"></div>
+    </div>
+  </div>
+
+  <!-- Active workers -->
+  <div class="card" style="margin-bottom: 16px;">
+    <div class="card-title">Active Workers</div>
+    <div id="workersContent" class="empty">No active workers</div>
+  </div>
+
+  <!-- Queue + Activity side by side -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Queue by App</div>
+      <div id="queueContent" style="margin-top:12px"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Activity Feed</div>
+        <span style="color:var(--muted);font-size:11px" id="feedCount">0 events</span>
+      </div>
+      <div class="feed" id="feedContent">
+        <div class="empty" style="padding:16px">Waiting for state changes...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- All tickets -->
   <div class="card">
-    <div class="card-title">Overall Progress</div>
-    <div class="stat-row"><span class="stat-label">Total</span><span class="stat-value" id="stat-total">-</span></div>
-    <div class="stat-row"><span class="stat-label">Closed</span><span class="stat-value" id="stat-closed" style="color:var(--green)">-</span></div>
-    <div class="stat-row"><span class="stat-label">In progress</span><span class="stat-value" id="stat-inprogress" style="color:var(--yellow)">-</span></div>
-    <div class="stat-row"><span class="stat-label">Open</span><span class="stat-value" id="stat-open" style="color:var(--blue)">-</span></div>
-    <div class="progress-bar"><div class="progress-fill" id="progress-fill-main" style="width:0%;background:var(--green)"></div></div>
+    <div class="card-header">
+      <div class="card-title">All Tickets</div>
+      <span style="color:var(--muted);font-size:11px" id="ticketCount">-</span>
+    </div>
+    <div id="ticketsContent"></div>
   </div>
-  <div class="card eta-card">
-    <div class="card-title">Estimated Completion</div>
-    <div class="stat-row"><span class="stat-label">Avg time/ticket</span><span class="stat-value" id="eta-avg">-</span></div>
-    <div class="stat-row"><span class="stat-label">Remaining</span><span class="stat-value" id="eta-remaining">-</span></div>
-    <div class="stat-row"><span class="stat-label">ETA</span><span class="stat-value" id="eta-time" style="color:var(--green)">-</span></div>
-    <div id="apps-list" style="margin-top:8px"></div>
-  </div>
-</div>
-
-<!-- Active workers -->
-<div class="card" style="margin-bottom: 16px;">
-  <div class="card-title">Active Workers</div>
-  <div id="workersContent" class="empty">No active workers</div>
-</div>
-
-<!-- Queue by app -->
-<div class="card" style="margin-bottom: 16px;">
-  <div class="card-title">Queue by App</div>
-  <div id="queueContent"></div>
-</div>
-
-<!-- Activity feed -->
-<div class="card" style="margin-bottom: 16px;">
-  <div class="card-header">
-    <div class="card-title">Activity Feed</div>
-    <span style="color:var(--muted);font-size:11px" id="feedCount">0 events</span>
-  </div>
-  <div class="feed" id="feedContent">
-    <div class="empty">No activity yet</div>
-  </div>
-</div>
-
-<!-- All tickets -->
-<div class="card">
-  <div class="card-header">
-    <div class="card-title">All Tickets</div>
-    <span style="color:var(--muted);font-size:11px" id="ticketCount">-</span>
-  </div>
-  <div id="ticketsContent"></div>
 </div>
 
 <div class="refresh-bar"><div class="refresh-bar-fill" id="refreshBar"></div></div>
@@ -332,7 +369,7 @@ function toggleTheme() {
   const curr = html.getAttribute('data-theme');
   const next = curr === 'dark' ? 'light' : 'dark';
   html.setAttribute('data-theme', next);
-  document.getElementById('btnTheme').textContent = next === 'dark' ? 'Light' : 'Dark';
+  document.getElementById('btnTheme').innerHTML = next === 'dark' ? '&#9788;' : '&#9790;';
   localStorage.setItem('forge-theme', next);
 }
 // Restore theme
@@ -341,7 +378,7 @@ function toggleTheme() {
   if (saved) {
     document.documentElement.setAttribute('data-theme', saved);
     const btn = document.getElementById('btnTheme');
-    if (btn) btn.textContent = saved === 'dark' ? 'Light' : 'Dark';
+    if (btn) btn.innerHTML = saved === 'dark' ? '&#9788;' : '&#9790;';
   }
 })();
 
@@ -385,13 +422,22 @@ function exportData(fmt) {
 // --- Expand ticket detail ---
 async function toggleDetail(id) {
   const row = document.querySelector(`tr.detail-row[data-detail="${id}"]`);
+  const clickRow = row?.previousElementSibling;
   if (!row) return;
-  if (row.classList.contains('open')) { row.classList.remove('open'); return; }
+  if (row.classList.contains('open')) {
+    row.classList.remove('open');
+    clickRow?.classList.remove('expanded');
+    return;
+  }
   // Close all others
-  document.querySelectorAll('tr.detail-row.open').forEach(r => r.classList.remove('open'));
+  document.querySelectorAll('tr.detail-row.open').forEach(r => {
+    r.classList.remove('open');
+    r.previousElementSibling?.classList.remove('expanded');
+  });
   const cell = row.querySelector('.detail-cell');
   cell.textContent = 'Loading...';
   row.classList.add('open');
+  clickRow?.classList.add('expanded');
   try {
     const res = await fetch(`/api/ticket?id=${encodeURIComponent(id)}`);
     const data = await res.json();
@@ -574,10 +620,18 @@ async function poll() {
     setText('lastUpdate', new Date().toLocaleTimeString());
 
     detectChanges(data);
-    renderSummary(data);
-    renderWorkers(data);
-    renderQueue(data);
-    renderTickets(data);
+
+    // Show/hide empty hero
+    const hasTickets = data.tickets.length > 0;
+    document.getElementById('emptyHero').style.display = hasTickets ? 'none' : 'block';
+    document.getElementById('mainContent').style.display = hasTickets ? 'block' : 'none';
+
+    if (hasTickets) {
+      renderSummary(data);
+      renderWorkers(data);
+      renderQueue(data);
+      renderTickets(data);
+    }
     prevData = data;
     animateRefreshBar();
   } catch (err) {
