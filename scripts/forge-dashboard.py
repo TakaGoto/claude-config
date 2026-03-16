@@ -152,7 +152,7 @@ function renderSummary(data) {
 
 function renderWorkers(data) {
   const container = document.getElementById('workersContent');
-  const workers = data.tickets.filter(t => t.status === 'in_progress' && t.assignee);
+  const workers = data.tickets.filter(t => t.status === 'in_progress');
 
   if (workers.length === 0) {
     container.innerHTML = '<div class="empty">No active workers</div>';
