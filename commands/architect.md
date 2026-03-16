@@ -7,7 +7,7 @@ Parse arguments:
 - `audit` or no args: evaluate the current project's architecture
 - `plan <description>`: design architecture for a new project or feature
 - `--scope <path>`: limit audit to a specific directory (e.g., `mobile/loki`, `web/signalai`)
-- `--focus <area>`: focus on a specific concern: `data`, `api`, `state`, `auth`, `scale`, `testing`, or `all` (default: `all`)
+- `--focus <area>`: deep-dive on a specific concern: `data`, `api`, `state`, `auth`, `scale`, `testing`, or `all` (default: `all`). When focused, still do a quick surface scan of other areas to catch cross-cutting issues — just spend 80% of effort on the focus area.
 
 ---
 
@@ -81,7 +81,17 @@ Check each area and rate it:
 - Are conventions consistent and discoverable?
 - Is the build/dev cycle fast?
 
-### Step 3: Identify Risks
+### Step 3: Deep Dive Weakest Area
+
+After scoring all 8 areas, identify the **lowest-graded area** and do a deeper investigation:
+
+- Read every file relevant to that area (not just a sample)
+- Look for patterns the surface scan missed (e.g., if Data Architecture scored lowest, trace every query path and check for consistency issues, missing indexes, orphaned data)
+- Produce 3-5 specific findings with file paths and line numbers
+
+This prevents the scorecard from being superficial — the worst area gets the scrutiny it deserves.
+
+### Step 4: Identify Risks
 
 Rank the top architectural risks:
 
@@ -89,7 +99,7 @@ Rank the top architectural risks:
 |---|------|----------|-----------|--------|------------|
 | 1 | | High/Med/Low | High/Med/Low | What breaks | How to fix |
 
-### Step 4: Output Report
+### Step 5: Output Report
 
 ```markdown
 # Architecture Audit — {project}
@@ -108,6 +118,9 @@ Rank the top architectural risks:
 | Security | A-F | |
 | Testing | A-F | |
 | Developer Experience | A-F | |
+
+## Deep Dive: {lowest-graded area}
+{3-5 specific findings with file paths from the deeper investigation}
 
 ## Top Risks
 {ranked risk table}
