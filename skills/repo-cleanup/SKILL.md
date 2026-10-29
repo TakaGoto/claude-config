@@ -80,7 +80,9 @@ Merging follows `policy.merge`:
 - `"none"`: leave the PR open.
 - Never promote, deploy, apply migrations, or publish OTAs, and never merge a PR other than the one this run opened.
 
-Tool permissions are an allow-list that matches simple commands only. Issue exactly one plain command per Bash call (`git`, `gh`, `du`, `wc`, `ls`, `find`): no pipes, `;`, `&&`, loops, `$(...)`, or redirects, and use a `-C <path>` or an absolute path instead of `cd`. Compound commands are denied silently, which would leave checks (like whether a PR was merged) undone. If a check still cannot run, put it in `flags` and do not delete anything that depended on it.
+Tool permissions are an allow-list that matches simple commands only. Issue exactly one plain command per Bash call (`git`, `gh`, `du`, `wc`, `ls`, `find`): no pipes, `;`, `&&`, loops, `$(...)`, or redirects, and use a `-C <path>` or an absolute path instead of `cd`. Compound commands are denied silently, which would leave checks (like whether a PR was merged) undone. Quote any `--format` argument in single quotes, because unquoted parentheses and `|` read as shell syntax and get the whole call denied (for example `git for-each-ref refs/heads --format='%(committerdate:unix) %(refname:short)'`). Fetch PR state in one call with a high limit, not a short list: `gh pr list --state merged --limit 500 --json headRefName`. If a check still cannot run, put it in `flags` and do not delete anything that depended on it; a branch with an unfinished classification is never deleted.
+
+Live sessions: `ps` cannot be relied on here, so use commit age instead. Never remove a worktree whose last commit is under 24 hours old (`git -C <path> log -1 --format=%ct`), or one under `.claude/jobs/`, because another session may be using it. Report those under `needs_your_call` instead.
 
 If the policy says dry run, change nothing (no deletes, edits, pushes, or PRs) and report what would be done.
 
