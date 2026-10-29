@@ -95,7 +95,7 @@ def repo_card(res, rep):
     link = f'<a href="{esc(pr["url"])}">{esc(pr["url"])}</a>' if str(pr.get("url", "")).startswith("https://") else ""
     err = '<p class="bad">Run failed: ' + esc((res.get("result") or "")[:400]) + "</p>" if res.get("is_error") or not rep else ""
     return f"""<section class="card"><h2>{esc(res['_repo'])} {pill}</h2>{err}
-<p class="muted">{total:,} tokens ({out:,} output) · ${res.get('total_cost_usd', 0):.2f} · {res.get('num_turns', '?')} turns</p>
+<p class="muted">{total:,} tokens ({out:,} output) · est. ${res.get('total_cost_usd', 0):.2f} ·{res.get('num_turns', '?')} turns</p>
 <p>{link} {esc(pr.get('reason', ''))}</p>
 <h3>Deleted branches ({len(rep.get('deleted_branches', []))})</h3>{lst(rep.get('deleted_branches', []))}
 <h3>Removed worktrees ({len(rep.get('deleted_worktrees', []))})</h3>{lst(rep.get('deleted_worktrees', []))}
@@ -137,11 +137,11 @@ main{{max-width:880px;margin:0 auto;padding:24px 16px}} h1{{margin:0 0 4px}} h2{
 ul{{margin:2px 0;padding-left:20px}} table{{width:100%;border-collapse:collapse}} td,th{{text-align:left;padding:4px 6px;border-bottom:1px solid var(--line)}}
 </style></head><body><main>
 <h1>Repo Cleanup Daily</h1><p class="muted">{esc(TODAY)}{mode} · generated {esc(datetime.datetime.now().strftime('%H:%M'))}</p>
-<div class="tiles"><div class="tile"><b>{total:,}</b>tokens used</div><div class="tile"><b>${cost:.2f}</b>cost</div>
+<div class="tiles"><div class="tile"><b>{total:,}</b>tokens used</div><div class="tile"><b>${cost:.2f}</b>est. cost (not billed)</div>
 <div class="tile"><b>{dele}</b>branches + worktrees removed</div><div class="tile"><b>{merged}</b>PRs merged</div></div>
 {''.join(repo_card(r, rep) for r, rep in day)}
-<h2>Last 14 days</h2><table><tr><th>Day</th><th>Tokens</th><th>Cost</th><th>Removed</th><th>Merged</th></tr>{history()}</table>
-<p class="muted">Token counts are the cleanup runs only; they include cached input. Publishing this report costs a little extra.</p>
+<h2>Last 14 days</h2><table><tr><th>Day</th><th>Tokens</th><th>Est. cost</th><th>Removed</th><th>Merged</th></tr>{history()}</table>
+<p class="muted">Token counts are the cleanup runs only; they include cached input. Runs use the Claude subscription login, so dollar figures are API-equivalent estimates, not charges.</p>
 </main></body></html>"""
 
 
