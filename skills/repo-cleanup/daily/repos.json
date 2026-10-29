@@ -1,0 +1,5 @@
+[
+  {"name": "liquidtcg", "path": "~/terror/mystcache/liquidtcg", "base": "staging", "merge": "staging"},
+  {"name": "tablepop", "path": "~/terror/to", "base": "main", "merge": "main"},
+  {"name": "cardpool", "path": "~/terror/cardpool", "base": "staging", "merge": "none"}
+]
