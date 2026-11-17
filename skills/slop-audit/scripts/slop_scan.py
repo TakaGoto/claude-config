@@ -164,13 +164,13 @@ RULES = [
          tell="One word of the headline in a different colour/italic/gradient.",
          fix="One voice for the whole headline; let the typeface carry it."),
     dict(id="slogan-headings", cat="copy", w=2, min=3, where="block",
-         rx=r"<h[23][^>]*>\s*[A-Z][a-z'’]*(?:[ ,]+[A-Za-z'’]+){0,6}\.\s*</h[23]>",
+         rx=r"<h[123][^>]*>\s*[A-Z][^<>{}\n]{2,70}?[a-z’']\.\s*</h[123]>",
          tell="Section headings written as short slogans ending in a period ('Ten games, one wall.').",
          fix="Plain labels from the product's nouns and numbers ('Singles in stock (1,014)')."),
     dict(id="eyebrow-caps", cat="claude-defaults", w=2, min=3, where="cls",
          rx=r"\buppercase\b[^\"'`]*\btracking-(wide|wider|widest|\[0?\.\d+em\])|\btracking-(wider|widest|\[0?\.\d+em\])[^\"'`]*\buppercase\b"
             r"|textTransform:\s*[\"']uppercase[\"'][^}]*letterSpacing|letterSpacing[^}]*textTransform:\s*[\"']uppercase",
-         tell="Tracked-out ALL-CAPS eyebrow/kicker labels above headings.",
+         tell="Eyebrow/kicker labels above headings (tracked ALL-CAPS, or small mono in the accent colour).",
          fix="Delete unless it carries real information; sentence case."),
     dict(id="hero-display-size", cat="type", w=1, min=1, where="cls",
          rx=r"\btext-(7xl|8xl|9xl)\b[^\"'`]*\b(font-bold|font-extrabold|tracking-tight)|\b(font-bold|font-extrabold|tracking-tight)[^\"'`]*\btext-(7xl|8xl|9xl)\b",
@@ -245,6 +245,7 @@ CSS_CLASS_TELLS = [
     ("gradient-text", lambda sel, body: re.search(r"background-clip:\s*text", body)),
 ]
 
+EYEBROW_NAME = re.compile(r"^(eyebrow|kicker|overline|pretitle|supertitle|super-title|section-label|tagline)(s|-\w+)?$|-(eyebrow|kicker|overline)$", re.I)
 EMOJI_RE = re.compile("[\U0001F300-\U0001FAFF\u2600-\u26FF\u2700-\u2712\u2718-\u27BF]")
 STRING_RE = re.compile(r"\"([^\"\n]{3,})\"|'([^'\n]{3,})'|`([^`\n]{3,})`|>([^<>{}\n]{3,})<")
 HEX_RE = re.compile(r"#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-zA-Z])")
@@ -255,7 +256,8 @@ OVERUSED_GLYPHS = {"Zap", "Rocket", "Shield", "ShieldCheck", "BarChart3", "BarCh
 LANDING_SECTIONS = ["hero", "features", "howitworks", "testimonials", "pricing", "faq", "cta",
                     "stats", "logocloud", "trustedby", "logos", "integrations", "newsletter"]
 DEFAULT_FONTS = {"inter", "geist", "geist sans", "geistsans", "system-ui", "ui-sans-serif", "roboto", "arial",
-                 "helvetica", "sans-serif", "-apple-system", "blinkmacsystemfont", "segoe ui", "open sans", "lato"}
+                 "helvetica", "sans-serif", "-apple-system", "blinkmacsystemfont", "segoe ui", "open sans", "lato",
+                 "ui-monospace", "monospace", "sfmono-regular", "menlo", "consolas", "courier new", "ui-serif", "serif"}
 OVERUSED_FONTS = {"inter", "geist", "space grotesk", "dm sans", "plus jakarta sans", "manrope", "outfit",
                   "poppins", "instrument serif", "fraunces", "playfair display", "jetbrains mono", "syne",
                   "sora", "satoshi", "montserrat", "ibm plex mono", "geist mono", "newsreader", "recoleta",
@@ -278,9 +280,9 @@ def hex_to_hsl(h):
 
 def classify_hex(h):
     hue, s, l = hex_to_hsl(h)
-    if 0.90 <= l <= 0.975 and 28 <= hue <= 52 and 0.18 <= s <= 0.65:
+    if 0.90 <= l <= 0.985 and 28 <= hue <= 52 and 0.18 <= s <= 0.65:
         return "cream"
-    if 8 <= hue <= 24 and 0.42 <= s <= 0.82 and 0.42 <= l <= 0.66:
+    if 8 <= hue <= 24 and 0.42 <= s <= 0.92 and 0.36 <= l <= 0.70:
         return "terracotta"
     if (hue >= 340 or hue < 8) and 0.45 <= s <= 0.85 and 0.22 <= l <= 0.5:
         return "warm-red"
@@ -407,10 +409,15 @@ def scan(roots, include_tests=False, max_loc=5, excludes=()):
     class_tells = defaultdict(set)
     class_defs = defaultdict(list)
     for rel, ext, src in files:
-        if ext not in STYLE_EXT and "<style" not in src:
+        if ext not in STYLE_EXT and "<style" not in src and not re.search(r"(STYLE|CSS|css|styles?)\s*=\s*`", src):
             continue
         for m in CSS_BLOCK_RE.finditer(src):
             sel, body = m.group(1), m.group(2)
+            for cls in re.findall(r"\.([A-Za-z_][\w-]*)", sel):
+                if EYEBROW_NAME.search(cls):
+                    class_tells[cls].add("eyebrow-caps")
+                    class_defs["eyebrow-caps"].append((rel, src.count("\n", 0, m.start()) + 1,
+                                                       sel.strip()[:80] + " { ... }"))
             for rid, test in CSS_CLASS_TELLS:
                 if test(sel, body):
                     ln = src.count("\n", 0, m.start(2)) + 1
@@ -461,6 +468,10 @@ def scan(roots, include_tests=False, max_loc=5, excludes=()):
                     fonts[n] += 1
         for m in re.finditer(r"fonts\.googleapis\.com/css2?\?family=([A-Za-z+]+)", src):
             fonts[m.group(1).replace("+", " ").lower()] += 1
+        for m in re.finditer(r"--font[\w-]*:\s*([^;}{]+)", src):
+            first = m.group(1).split(",")[0].strip().strip("'\"")
+            if first and not first.startswith(("var(", "inherit", "initial")):
+                fonts[first.lower()] += 1
         for m in re.finditer(r"font-family:\s*([^;}{]+)", src):
             first = m.group(1).split(",")[0].strip().strip("'\"")
             if first and not first.startswith(("var(", "inherit", "initial")):
@@ -586,6 +597,11 @@ def scan(roots, include_tests=False, max_loc=5, excludes=()):
         add("cream-serif", "claude-defaults", 2, colours["cream"],
             "Cream ground with a serif display face (the 'tasteful' default).", "Ground from the subject's world.",
             colour_locs["cream"])
+    if colours["near-black"] and warm:
+        add("dark-warm-house-style", "claude-defaults", 2, colours["near-black"] + warm,
+            "Near-black canvas with a single coral/vermilion/terracotta accent: Claude's dark house look.",
+            "If dark is right, build it on a hue with several tones; pick the accent from the subject.",
+            colour_locs["near-black"][:2] + colour_locs["terracotta"][:2] + colour_locs["warm-red"][:2])
     if colours["near-black"] and colours["acid"]:
         add("dark-acid-house-style", "claude-defaults", 2, colours["acid"],
             "Near-black canvas with a single acid-green/lime accent.", "Only if the brand truly lives there.",

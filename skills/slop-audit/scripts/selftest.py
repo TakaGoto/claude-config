@@ -49,6 +49,12 @@ if any(".label" in loc[2] for f in classmap["findings"] for loc in f["locations"
 if "space grotesk" not in classmap["fonts"]:
     ok = False
     print("FAIL: next/font/local family not detected: %s" % classmap["fonts"])
+dark = slop_scan.scan(os.path.join(HERE, "fixtures", "dark-coral"), include_tests=True)
+dk = {f["id"] for f in dark["findings"]}
+for need in ("eyebrow-caps", "slogan-headings", "default-typeface", "dark-warm-house-style"):
+    if need not in dk:
+        ok = False
+        print("FAIL: dark-coral fixture (CSS-in-TS page) missed %s; got %s" % (need, sorted(dk)))
 print("sloppy: %d findings, tier %s | clean: %d findings, tier %s" % (
     len(sloppy["findings"]), sloppy["tier"], len(clean["findings"]), clean["tier"]))
 print("PASS" if ok else "FAILED")
