@@ -2,6 +2,10 @@
 
 Human-made design is recognisable by specificity and by decisions that cost something: a typeface that commits, a layout shaped by the content, copy only this product could say, details that only make sense for this subject. Each section below lists what to do, not what to avoid (defaults.md covers that).
 
+## Conscious choices
+
+Generic design is the sum of properties nobody decided. For the elements that matter most (the hero, the primary action, the main data display) decide every property explicitly: position, size, colour, weight, copy, state changes, motion. Give the less important elements high-level rules. The more conscious choices on the important parts, the less generic the result, even before taste comes into it.
+
 ## Type
 
 - Pick the family for the subject and its context of use, then name the roles in tokens (display, text, data). One family with real weight contrast is often stronger than two.
@@ -34,6 +38,7 @@ Human-made design is recognisable by specificity and by decisions that cost some
 ## Motion
 
 - One orchestrated moment at most (a first-load sequence, or one scroll-linked object). Everything else responds to the user's own actions and shows what changed.
+- Time to information beats atmosphere, especially for B2B: no scroll-jacked intros, scroll-triggered videos or autoplaying animation that delays what the page says. Featured launch pages are the exception, not the template.
 - Exponential ease-out, short durations, specific properties (transform, opacity). Honour reduced motion.
 
 ## Imagery and icons

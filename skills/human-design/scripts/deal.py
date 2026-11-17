@@ -27,6 +27,24 @@ AXES = ["type", "palette", "hue", "layout", "shape", "density", "motion", "image
 ASSETS = {"photos", "illustrator", "signer", "screens", "artefacts"}
 
 
+LOCAL_DECK = os.path.join(HERE, "..", "data", "deck.local.json")
+
+
+def load_deck():
+    """The shared deck plus the owner's deck.local.json; local entries replace shared ones with the same id
+    and are marked 'personal' so they get priority when dealing."""
+    deck = json.load(open(DECK))
+    if os.path.exists(LOCAL_DECK):
+        local = json.load(open(LOCAL_DECK))
+        for axis in AXES:
+            mine = [dict(o, personal=True) for o in local.get(axis, [])]
+            ids = {o["id"] for o in mine}
+            deck[axis] = mine + [o for o in deck[axis] if o["id"] not in ids]
+        for word, tags in local.get("synonyms", {}).items():
+            deck.setdefault("synonyms", {})[word] = tags
+    return deck
+
+
 def load_history():
     if not os.path.exists(HISTORY):
         return []
@@ -85,7 +103,7 @@ def deal(deck, tags, count, mode, locks, excludes, have, rng, avoid_recent):
         scores = {o["id"]: len(tags & set(o.get("tags", []))) for o in opts}
         if tags and len([o for o in opts if scores[o["id"]] > 0]) >= count:
             opts = [o for o in opts if scores[o["id"]] > 0]
-        weights = [1 + 3 * scores[o["id"]] for o in opts]
+        weights = [(1 + 3 * scores[o["id"]]) * (3 if o.get("personal") else 1) for o in opts]
         chosen = []
         while len(chosen) < count:
             avail = [(o, w) for o, w in zip(opts, weights) if o not in chosen] or list(zip(opts, weights))
@@ -155,7 +173,7 @@ def main():
             f.write(json.dumps(entry) + "\n")
         print("recorded to %s: %s" % (os.path.abspath(HISTORY), json.dumps(entry)))
         return
-    deck = json.load(open(DECK))
+    deck = load_deck()
     tags, matched = brief_tags(a.brief, deck)
     have = {x.strip() for x in a.have.split(",") if x.strip()}
     unknown = have - ASSETS

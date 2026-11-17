@@ -73,6 +73,7 @@ These come from Anthropic's current frontend-design skill, which lists them as w
 | Stock effect components (Magic UI / Aceternity: number ticker, marquee, beams, meteors, spotlight) `effect-library` | P1 | S R | Cut; design one moment specific to the product. |
 | Fade-and-slide-up on every section `fade-up-everything`; hover-scale on every card `hover-lift` | P1 | S R | One orchestrated moment; hover feedback only on things that act. |
 | transition-all everywhere `transition-all`; bounce/elastic easing `bounce-easing`; pulsing "live" dots `decorative-pulse` | P2 | S | Animate specific properties with exponential ease-out; animate status only when real. |
+| Scroll-jacked intros, scroll-triggered video, autoplaying animation that delays the message ("half a minute of scrolling to reach a statement that says nothing") | P1 | R | Say what it is in the first viewport; reserve cinematic scroll for a featured launch page. |
 
 ## 6. Icons and imagery
 

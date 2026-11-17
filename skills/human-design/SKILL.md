@@ -11,6 +11,7 @@ What works is replacing taste-by-adjective with **decisions made outside the mod
 
 ## 0. Start from what exists
 
+- **Your taste first.** Read `~/.claude/skills/human-design/taste.md` if it exists: the owner's loved and hated references, type and colour preferences, and how they weigh conflicting choices. It outranks the deck and these references (the brief still outranks it). If it does not exist and the user is around, offer a five-minute interview using references/taste-template.md (two sites they love and why, two they hate and why, their density, motion and voice preferences) and save the answers there. A skill thousands of people install drifts into its own house style; the owner's taste is what keeps the output theirs.
 - If the product already has a design system (DESIGN.md, tokens, a component library, brand guide), work inside it. Only run the direction steps (3–5) when the user asks for a new direction or slop-audit recommended one.
 - **Claude Design bundle**: if the user designed in Claude Design and exported a handoff bundle, treat it as the source of truth for layout and tokens, but still run step 4 (default check) on it, since Claude Design converges on the same clusters. Claude Design can also extract a design system from an existing repo, Figma file or live URL; suggest that when the user has a brand elsewhere.
 - **Brand kits**: DESIGN.md files from real products (VoltAgent/awesome-design-md, getdesign.md, or UXKIN `find_ui_materials` if connected) are valid starting points when the user picks one. Use them as a base to diverge from, never as the final look, and never copy a brand's logo, name or illustrations.
@@ -26,7 +27,9 @@ Write a short brief before any visual decision. If facts are missing, ask once; 
 - **Constraints**: platform, accessibility, brand assets, what must not change.
 - **Pre-launch products**: sample data is fine when it is labelled as sample, but anything a mock screen implies (a sort order, a report, an integration) is a feature claim. List every such claim as an assumption for the user to confirm.
 
-Save it in the project as PRODUCT.md (or the top of DESIGN.md).
+Save it in the project as PRODUCT.md (or the top of DESIGN.md). If the user is present, interview them instead of guessing: a few pointed questions about who it is for and what they love and hate beat any number of assumptions.
+
+**Assets come before layout.** A design full of stock photos cannot be rescued by layout. If the direction needs imagery, get or make the real thing first (product screenshots, photos of the subject, scans, a commissioned illustration), and pass what exists to step 3 with `--have`.
 
 ## 2. Evidence board
 
@@ -92,9 +95,11 @@ Follow references/craft.md: type, colour, layout, shape, motion, imagery, copy a
 
 1. Static: `python3 ~/.claude/skills/slop-audit/scripts/slop_scan.py <src>`. Target: tier clean or mild, no P0 finding. Every remaining finding is either fixed or explicitly chosen (note it in DESIGN.md). A clean scan is necessary, not sufficient: the scanner only knows named clusters.
 2. Rendered: screenshot the key screens at 390px and 1440px (plus 768px for flows): `python3 ~/.claude/skills/slop-audit/scripts/shoot.py <url-or-html-file> --out <dir> --full`, or Playwright / Claude in Chrome for flows that need clicks. Look at every image. Critique problems first, praise never: run slop-audit's glance, swap, silhouette and copy-read tests on your own screenshots.
-3. At most two fix rounds, then report. Say what was checked in a browser and what is unproven.
+3. At most two fix rounds, then report. Say what was checked in a browser and what is unproven. Emulated widths are not devices: say so, and ask for a check on a real phone (tap targets, scrolling, text size) before anything ships.
 
-A final polish pass (spacing rhythm, motion timing, micro-copy) is fine, but it comes after the gate passes, not instead of it.
+## 9. Hand over the last 10%
+
+The sites people admire are rarely one-shot: a person with taste spends the last hour on spacing, type and cutting what is generic. Don't present the work as finished. End with a short list of the 5–10 decisions most worth the owner's eye, each with its screenshot and the alternative you considered (for example: "headline at 56px vs 44px", "accent only on the primary button or also on links", "table rows at 44px vs 36px"). When they change something, write the reason into DESIGN.md and, if it is a general preference, into taste.md, so the next project starts from it.
 
 ## Files
 
@@ -104,3 +109,4 @@ A final polish pass (spacing rhythm, motion timing, micro-copy) is fine, but it 
 - `references/defaults.md`: what convergence looks like and what to do instead.
 - `references/craft.md`: the practices that make a design read as made by a person.
 - `references/design-md-template.md`: DESIGN.md skeleton.
+- `references/taste-template.md`: the owner's taste profile (saved as `taste.md`) and the personal deck (`data/deck.local.json`).
